@@ -9,4 +9,5 @@ from .parameterization import DVGeometryAxi
 from .parameterization import DVGeometryCST
 from .parameterization import DVGeometryVSP
 from .parameterization import DVGeometryESP
+from .parameterization import DVGeometryCustom
 from .parameterization import DVGeometryMulti

@@ -13,3 +13,4 @@ input_files
 .isort.cfg
 *.vscode
 tests/reg_tests/reports/
+build/*
