@@ -66,9 +66,14 @@ class DVGeometryCustom(DVGeoSketch):
         if self.comm.rank == 0:
             print('Initialize Success')
 
-    def _updateModel(self, dv_dict, cache=False):
+    def _updateModel(self, dv_dict, cache: bool = False, keep_shape: bool = False):
         
-        surface = np.asarray(self.generator(dv_dict, config=self.config, save_surface=(cache and self.comm.rank == 0)), dtype=float).reshape(-1, 3)
+        surface = np.asarray(self.generator(dv_dict, config=self.config, save_surface=(cache and self.comm.rank == 0)), dtype=float)
+
+        assert not (cache and keep_shape), "can not cache original shape surface"
+
+        if not keep_shape:
+            surface = surface.reshape(-1, 3)
         
         if cache:
             # cache the current surface
