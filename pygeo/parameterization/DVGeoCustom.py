@@ -27,7 +27,7 @@ class DVGeometryCustom(DVGeoSketch):
     '''
     
     def __init__(self, fileName, generator: Union[Callable, List[Callable]],
-                 comm=MPI.COMM_WORLD, scale=1.0, projTol=1e-5, name=None, config=None):
+                 comm=MPI.COMM_WORLD, scale=1.0, projTol=1e-5, name=None, config=None, debug: bool = False):
         
         super().__init__(fileName=fileName, comm=comm, scale=scale, projTol=projTol, name=name)
 
@@ -36,6 +36,7 @@ class DVGeometryCustom(DVGeoSketch):
             
         self.generator = generator
         self.n_generators = len(generator)
+        self.debug = debug
         
         self.parameters = {}
         with open(fileName, 'r') as f:
@@ -64,20 +65,27 @@ class DVGeometryCustom(DVGeoSketch):
         self._initialize_baseline_surface()
         
     def _initialize_baseline_surface(self):
-        # print('Start Initialize')
+        if self.comm.rank == 0 and self.debug: print('Start Initialize')
         if self._baseline_initialized:
             return
         _ = self._updateModel(self.parameters, cache=True)
         self._baseline_initialized = True
-        if self.comm.rank == 0:
-            print('Initialize Success')
+        if  self.comm.rank == 0 and self.debug: print('Initialize Success')
 
     def _updateOneModel(self, i_gen, dv_dict, keep_shape: bool = False, save_surface: bool = False):
         
         surface = np.asarray(self.generator[i_gen](dv_dict, config=self.config, save_surface=save_surface), dtype=float)
 
         if not keep_shape:
-            surface = surface.reshape(-1, 3)
+            # surface = surface.reshape(-1, 3)
+            if surface.shape[-1] == 3:
+                surface = surface.reshape(-1, 3)
+            elif surface.shape[0] == 3:
+                surface = surface.reshape(3, -1).T
+            else:
+                raise Error(
+                    f"Surface grid must have a length-3 axis when flattened. Got shape {surface.shape}."
+                )
 
         return surface
 
@@ -86,7 +94,7 @@ class DVGeometryCustom(DVGeoSketch):
         updated_surface: List[np.ndarray] = []
         
         for i in range(self.n_generators):
-            updated_surface.append(self._updateOneModel(i, dv_dict, keep_shape, save_surface=(cache and self.comm.rank == 0)))
+            updated_surface.append(self._updateOneModel(i, dv_dict, keep_shape, save_surface=(self.debug and cache and self.comm.rank == 0)))
 
         assert not (cache and keep_shape), "can not cache original shape surface"
             
@@ -275,7 +283,7 @@ class DVGeometryCustom(DVGeoSketch):
         meta["mapping_index"] = i
             
         if self.comm.rank == 0:
-            print(f'add pointset "{ptName}" of size {points.shape} with type "{meta["type"]} to Gen. {meta["mapping_index"]} (Distri. = {meta["distributed"]})" -- max Dist = {max(distances[:, 0]):.2e}')
+            print(f'add pointset "{ptName}" of size {coords.shape} with type "{meta["type"]} to Gen. {meta["mapping_index"]} (Distri. = {meta["distributed"]})" -- max Dist = {max(distances[:, 0]):.2e}')
         
         self.pointSets[ptName] = meta
         # Keep a copy in self.points so external callers (e.g. ADflow) know the pointset exists.
